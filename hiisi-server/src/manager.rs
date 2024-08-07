@@ -22,7 +22,8 @@ pub struct ResourceManager {
     ///
     /// We keep a tuple of database and connection in the cache because we
     /// need at least one connection to SQLite to keep the database in memory.
-    memory_resident_dbs: RefCell<SieveCache<String, (Rc<libsql::Database>, Rc<libsql::Connection>)>>,
+    memory_resident_dbs:
+        RefCell<SieveCache<String, (Rc<libsql::Database>, Rc<libsql::Connection>)>>,
 
     /// Open connections to databases.
     ///

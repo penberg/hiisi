@@ -2,19 +2,36 @@
 
 use crate::manager::ResourceManager;
 use crate::proto;
-use crate::{InfernoError, Result};
+use crate::{HiisiError, Result};
 use std::rc::Rc;
+
+pub struct Request {
+    pub database: String,
+    pub req: proto::PipelineReqBody,
+}
+
+impl Request {
+    fn baton(&self) -> String {
+        self.req.baton.to_owned().unwrap_or(generate_baton())
+    }
+}
+
+fn generate_baton() -> String {
+    // NOTE: This is different from the baton generation in libSQL server.
+    uuid::Uuid::new_v4().to_string()
+}
 
 pub async fn execute_client_req(
     manager: Rc<ResourceManager>,
-    req: proto::PipelineReqBody,
-    db_name: &str,
-    baton: &str,
+    req: Request,
 ) -> Result<proto::PipelineRespBody> {
+    let db_name = &req.database;
+    let baton = &req.baton();
+    let req = &req.req;
     let mut responses = Vec::new();
     responses
         .try_reserve(req.requests.len())
-        .map_err(|_| InfernoError::OutOfMemory)?;
+        .map_err(|_| HiisiError::OutOfMemory)?;
     for req in &req.requests {
         let resp = match req {
             proto::StreamRequest::None => todo!(),
@@ -32,7 +49,7 @@ pub async fn execute_client_req(
         responses.push(resp);
     }
     return Ok(proto::PipelineRespBody {
-        baton: Some(baton.to_string()),
+        baton: Some(baton.to_owned()),
         base_url: None,
         results: responses,
     });
@@ -63,7 +80,7 @@ async fn exec_execute(
         baton
     );
     let conn = manager.get_conn(db_name, baton).await?;
-    let sql = req.stmt.sql.as_ref().ok_or(InfernoError::InternalError(
+    let sql = req.stmt.sql.as_ref().ok_or(HiisiError::InternalError(
         "No SQL statement found".to_string(),
     ))?;
     let rs = conn.query(sql, libsql::params!()).await?;
@@ -77,7 +94,7 @@ async fn make_execute_result(mut rs: libsql::Rows) -> Result<proto::StreamResult
     for i in 0..column_count {
         let col = rs
             .column_name(i)
-            .ok_or(InfernoError::InternalError(format!(
+            .ok_or(HiisiError::InternalError(format!(
                 "No column name found for column {}",
                 i
             )))?;
@@ -91,19 +108,7 @@ async fn make_execute_result(mut rs: libsql::Rows) -> Result<proto::StreamResult
     loop {
         match rs.next().await? {
             Some(row) => {
-                let mut values = Vec::new();
-                for i in 0..column_count {
-                    let value = row.get_value(i)?;
-                    let value: proto::Value = match value {
-                        libsql::Value::Null => proto::Value::Null,
-                        libsql::Value::Integer(i) => proto::Value::Integer { value: i },
-                        libsql::Value::Real(f) => proto::Value::Float { value: f },
-                        libsql::Value::Text(s) => proto::Value::Text { value: s.into() },
-                        libsql::Value::Blob(b) => proto::Value::Blob { value: b.into() },
-                    };
-                    values.push(value);
-                }
-                rows.push(proto::Row { values });
+                rows.push(to_row(row, column_count)?);
             }
             None => break,
         }
@@ -123,4 +128,20 @@ async fn make_execute_result(mut rs: libsql::Rows) -> Result<proto::StreamResult
     Ok(proto::StreamResult::Ok {
         response: proto::StreamResponse::Execute(resp),
     })
+}
+
+fn to_row(row: libsql::Row, column_count: i32) -> Result<proto::Row> {
+    let mut values = Vec::new();
+    for i in 0..column_count {
+        let value = row.get_value(i)?;
+        let value: proto::Value = match value {
+            libsql::Value::Null => proto::Value::Null,
+            libsql::Value::Integer(i) => proto::Value::Integer { value: i },
+            libsql::Value::Real(f) => proto::Value::Float { value: f },
+            libsql::Value::Text(s) => proto::Value::Text { value: s.into() },
+            libsql::Value::Blob(b) => proto::Value::Blob { value: b.into() },
+        };
+        values.push(value);
+    }
+    Ok(proto::Row { values })
 }

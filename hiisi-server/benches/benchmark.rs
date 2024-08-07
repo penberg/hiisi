@@ -1,19 +1,19 @@
 use criterion::async_executor::FuturesExecutor;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use inferno::manager;
+use hiisi::manager;
 use pprof::criterion::{Output, PProfProfiler};
 use std::rc::Rc;
 
 fn bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("inferno");
+    let mut group = c.benchmark_group("hiisi");
     group.throughput(Throughput::Elements(1));
 
     let manager = Rc::new(manager::ResourceManager::new());
     group.bench_function("execute", |b| {
         b.to_async(FuturesExecutor).iter(|| async {
             let exec_req =
-                inferno::proto::StreamRequest::Execute(inferno::proto::ExecuteStreamReq {
-                    stmt: inferno::proto::Stmt {
+                hiisi::proto::StreamRequest::Execute(hiisi::proto::ExecuteStreamReq {
+                    stmt: hiisi::proto::Stmt {
                         sql: Some("SELECT 1".to_string()),
                         sql_id: None,
                         args: vec![],
@@ -22,11 +22,15 @@ fn bench(c: &mut Criterion) {
                         replication_index: None,
                     },
                 });
-            let req = inferno::proto::PipelineReqBody {
+            let req = hiisi::proto::PipelineReqBody {
                 baton: None,
                 requests: vec![exec_req],
             };
-            inferno::executor::execute_client_req(manager.clone(), req, "test").await;
+            let req = hiisi::executor::Request {
+                database: "test".to_string(),
+                req
+            };
+            hiisi::executor::execute_client_req(manager.clone(), req).await.unwrap();
         });
     });
 }

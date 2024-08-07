@@ -12,7 +12,7 @@ pub fn parse_client_req(msg: &[u8]) -> Result<PipelineReqBody> {
 }
 
 /// Format a client response message.
-pub fn format_client_req(msg: &PipelineRespBody) -> Result<Bytes> {
+pub fn format_msg<T: Serialize>(msg: &T) -> Result<Bytes> {
     let msg = serde_json::ser::to_vec(msg)?;
     Ok(Bytes::from(msg))
 }
