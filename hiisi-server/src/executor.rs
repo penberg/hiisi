@@ -1,5 +1,6 @@
 //! Query executor.
 
+use crate::database::{StepResult, Stmt, Type};
 use crate::manager::ResourceManager;
 use crate::proto;
 use crate::{HiisiError, Result};
@@ -83,32 +84,36 @@ async fn exec_execute(
     let sql = req.stmt.sql.as_ref().ok_or(HiisiError::InternalError(
         "No SQL statement found".to_string(),
     ))?;
-    let rs = conn.query(sql, libsql::params!()).await?;
-    let result = make_execute_result(rs).await?;
+    let stmt = conn.prepare(sql)?;
+    let result = make_execute_result(stmt).await?;
     Ok(result)
 }
 
-async fn make_execute_result(mut rs: libsql::Rows) -> Result<proto::StreamResult> {
-    let column_count = rs.column_count();
+async fn make_execute_result(stmt: Stmt) -> Result<proto::StreamResult> {
+    let column_count = stmt.column_count();
     let mut cols = Vec::with_capacity(column_count as usize);
     for i in 0..column_count {
-        let col = rs.column_name(i).ok_or(HiisiError::InternalError(format!(
-            "No column name found for column {}",
-            i
-        )))?;
+        let name = stmt
+            .column_name(i)
+            .ok_or(HiisiError::InternalError(format!(
+                "No column name found for column {}",
+                i
+            )))?;
+        let decltype = stmt.column_decltype(i);
         let col = proto::Col {
-            name: Some(col.to_string()),
-            decltype: None, // FIXME
+            name: Some(name.into()),
+            decltype: decltype.map(Into::into),
         };
         cols.push(col);
     }
     let mut rows = Vec::new();
     loop {
-        match rs.next().await? {
-            Some(row) => {
-                rows.push(to_row(row, column_count)?);
+        match stmt.step()? {
+            StepResult::Row => {
+                let row = to_row(&stmt, column_count)?;
+                rows.push(row);
             }
-            None => break,
+            StepResult::Done => break,
         }
     }
     let resp = proto::ExecuteStreamResp {
@@ -128,16 +133,29 @@ async fn make_execute_result(mut rs: libsql::Rows) -> Result<proto::StreamResult
     })
 }
 
-fn to_row(row: libsql::Row, column_count: i32) -> Result<proto::Row> {
+fn to_row(stmt: &Stmt, column_count: i32) -> Result<proto::Row> {
     let mut values = Vec::new();
     for i in 0..column_count {
-        let value = row.get_value(i)?;
-        let value: proto::Value = match value {
-            libsql::Value::Null => proto::Value::Null,
-            libsql::Value::Integer(i) => proto::Value::Integer { value: i },
-            libsql::Value::Real(f) => proto::Value::Float { value: f },
-            libsql::Value::Text(s) => proto::Value::Text { value: s.into() },
-            libsql::Value::Blob(b) => proto::Value::Blob { value: b.into() },
+        let value = match stmt.column_type(i) {
+            Type::Null => proto::Value::Null,
+            Type::Integer => {
+                let i = stmt.column_int(i);
+                proto::Value::Integer { value: i }
+            }
+            Type::Float => {
+                let f = stmt.column_float(i);
+                proto::Value::Float { value: f }
+            }
+            Type::Text => {
+                let s = stmt.column_text(i).to_string();
+                proto::Value::Text { value: s.into() }
+            }
+            Type::Blob => {
+                let b = stmt.column_blob(i);
+                proto::Value::Blob {
+                    value: b.to_owned().into(),
+                }
+            }
         };
         values.push(value);
     }
