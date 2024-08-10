@@ -46,7 +46,7 @@ impl<C> IO<C> {
     }
 
     pub fn run_once(&mut self) {
-        println!("Running IO loop");
+        log::debug!("Running IO loop");
         self.events.clear();
         let _ = self.poller.wait(&mut self.events, None);
         self.flush_submissions();
@@ -54,9 +54,9 @@ impl<C> IO<C> {
     }
 
     fn flush_submissions(&mut self) {
-        println!("Flushing submissions");
+        log::debug!("Flushing submissions");
         for event in self.events.iter() {
-            println!("Event: {:?}", event.key);
+            log::debug!("Event: {:?}", event.key);
             let c = self.submissions.remove(&event.key).unwrap();
             c.prepare();
             match &c {
@@ -78,7 +78,7 @@ impl<C> IO<C> {
     }
 
     fn flush_completions(&mut self) {
-        println!("Flushing completions");
+        log::debug!("Flushing completions");
         loop {
             let c = self.completions.pop_front();
             if let Some(c) = c {
@@ -95,7 +95,7 @@ impl<C> IO<C> {
         server_addr: socket2::SockAddr,
         cb: AcceptCallback<C>,
     ) {
-        println!("Accepting connection on sockfd {:?}", server_sock);
+        log::debug!("Accepting connection on sockfd {:?}", server_sock);
         let c = Completion::Accept {
             server_sock,
             server_addr,
@@ -114,12 +114,12 @@ impl<C> IO<C> {
     }
 
     pub fn close(&mut self, sock: Rc<socket2::Socket>) {
-        println!("Closing sockfd {:?}", sock);
+        log::debug!("Closing sockfd {:?}", sock);
         drop(sock);
     }
 
     pub fn recv(&mut self, sock: Rc<socket2::Socket>, cb: RecvCallback<C>) {
-        println!("Receiving on sockfd {:?}", sock);
+        log::debug!("Receiving on sockfd {:?}", sock);
         let c = Completion::Recv { sock, cb };
         let key = self.get_key();
         match &c {
@@ -134,7 +134,7 @@ impl<C> IO<C> {
     }
 
     pub fn send(&mut self, sock: Rc<socket2::Socket>, buf: Bytes, n: usize, cb: SendCallback<C>) {
-        println!("Sending on sockfd {:?}", sock);
+        log::debug!("Sending on sockfd {:?}", sock);
         let c = Completion::Send { sock, buf, n, cb };
         let key = self.get_key();
         match &c {

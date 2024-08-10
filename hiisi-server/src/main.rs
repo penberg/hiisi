@@ -23,6 +23,8 @@ fn main() {
 }
 
 fn server_loop(cli: Cli) -> Result<HiisiError> {
+    log::info!("Listening for HTTP requests on {:?}", cli.http_listen_addr);
+
     let listen_addr: SockAddr = cli.http_listen_addr.into();
     let sock = listen(&listen_addr)?;
 
