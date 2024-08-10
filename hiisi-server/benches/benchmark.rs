@@ -11,26 +11,27 @@ fn bench(c: &mut Criterion) {
     let manager = Rc::new(manager::ResourceManager::new());
     group.bench_function("execute", |b| {
         b.to_async(FuturesExecutor).iter(|| async {
-            let exec_req =
-                hiisi::proto::StreamRequest::Execute(hiisi::proto::ExecuteStreamReq {
-                    stmt: hiisi::proto::Stmt {
-                        sql: Some("SELECT 1".to_string()),
-                        sql_id: None,
-                        args: vec![],
-                        named_args: vec![],
-                        want_rows: None,
-                        replication_index: None,
-                    },
-                });
+            let exec_req = hiisi::proto::StreamRequest::Execute(hiisi::proto::ExecuteStreamReq {
+                stmt: hiisi::proto::Stmt {
+                    sql: Some("SELECT 1".to_string()),
+                    sql_id: None,
+                    args: vec![],
+                    named_args: vec![],
+                    want_rows: None,
+                    replication_index: None,
+                },
+            });
             let req = hiisi::proto::PipelineReqBody {
                 baton: None,
                 requests: vec![exec_req],
             };
             let req = hiisi::executor::Request {
                 database: "test".to_string(),
-                req
+                req,
             };
-            hiisi::executor::execute_client_req(manager.clone(), req).await.unwrap();
+            hiisi::executor::execute_client_req(manager.clone(), req)
+                .await
+                .unwrap();
         });
     });
 }

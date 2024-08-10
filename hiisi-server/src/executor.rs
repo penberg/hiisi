@@ -92,12 +92,10 @@ async fn make_execute_result(mut rs: libsql::Rows) -> Result<proto::StreamResult
     let column_count = rs.column_count();
     let mut cols = Vec::with_capacity(column_count as usize);
     for i in 0..column_count {
-        let col = rs
-            .column_name(i)
-            .ok_or(HiisiError::InternalError(format!(
-                "No column name found for column {}",
-                i
-            )))?;
+        let col = rs.column_name(i).ok_or(HiisiError::InternalError(format!(
+            "No column name found for column {}",
+            i
+        )))?;
         let col = proto::Col {
             name: Some(col.to_string()),
             decltype: None, // FIXME
