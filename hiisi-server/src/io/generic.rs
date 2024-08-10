@@ -1,9 +1,8 @@
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use polling::{Event, Events, Poller};
 
 use std::collections::{HashMap, VecDeque};
 use std::future::Future;
-use std::mem::MaybeUninit;
 use std::os::fd::AsRawFd;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -217,10 +216,13 @@ impl<C> Completion<C> {
                 todo!();
             }
             Completion::Recv { sock, cb } => {
-                let mut buf = MaybeUninit::uninit_array::<4096>();
-                let n = sock.recv(&mut buf).unwrap();
-                let buf = unsafe { MaybeUninit::array_assume_init(buf) };
-                cb(io, sock, &buf, n);
+                let mut buf = BytesMut::with_capacity(4096);
+                let uninit = buf.spare_capacity_mut();
+                let n = sock.recv(uninit).unwrap();
+                unsafe {
+                    buf.set_len(n);
+                }
+                cb(io, sock, &buf[..], n);
             }
             Completion::Send { sock, buf, n, cb } => {
                 let n = sock.send(&buf[..n]).unwrap();
