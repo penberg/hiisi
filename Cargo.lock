@@ -859,12 +859,14 @@ checksum = "fbf6a919d6cf397374f7dfeeea91d974c7c0a7221d0d0f4f20d859d329e53fcc"
 name = "hiisi"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "base64 0.22.1",
  "bytes",
  "clap",
  "criterion",
  "env_logger",
  "futures",
+ "http 1.1.0",
  "http-body-util",
  "httparse",
  "libsql",

@@ -15,11 +15,13 @@ name = "hiisid"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0.86"
 base64 = "0.22.1"
 bytes = { version = "1" }
 clap = { version = "4.5", features = [ "derive", "env", "string" ] }
 env_logger = "0.11.5"
 futures = "0.3"
+http = "1.1.0"
 http-body-util = "0.1"
 httparse = "1.9.4"
 libsql = { git = "https://github.com/tursodatabase/libsql" }
