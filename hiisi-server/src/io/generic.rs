@@ -3,13 +3,13 @@ use polling::{Event, Events, Poller};
 
 use std::collections::{HashMap, VecDeque};
 use std::future::Future;
-use std::os::fd::AsRawFd;
 use std::pin::Pin;
 use std::rc::Rc;
 
 pub struct IO<C> {
     poller: Poller,
     events: Events,
+    key_seq: usize,
     submissions: HashMap<usize, Completion<C>>,
     completions: VecDeque<Completion<C>>,
     context: C,
@@ -20,6 +20,7 @@ impl<C> IO<C> {
         Self {
             poller: Poller::new().unwrap(),
             events: Events::new(),
+            key_seq: 0,
             submissions: HashMap::new(),
             completions: VecDeque::new(),
             context,
@@ -94,60 +95,67 @@ impl<C> IO<C> {
         server_addr: socket2::SockAddr,
         cb: AcceptCallback<C>,
     ) {
-        println!("Accepting connection on sockfd {}", server_sock.as_raw_fd());
+        println!("Accepting connection on sockfd {:?}", server_sock);
         let c = Completion::Accept {
             server_sock,
             server_addr,
             cb,
         };
+        let key = self.get_key();
         match &c {
             Completion::Accept { server_sock, .. } => unsafe {
-                self.poller
-                    .add(server_sock, Event::readable(c.key()))
-                    .unwrap();
+                self.poller.add(server_sock, Event::readable(key)).unwrap();
             },
             _ => {
                 todo!();
             }
         }
-        self.enqueue(c);
+        self.enqueue(key, c);
     }
 
     pub fn close(&mut self, sock: Rc<socket2::Socket>) {
-        println!("Closing sockfd {}", sock.as_raw_fd());
+        println!("Closing sockfd {:?}", sock);
         drop(sock);
     }
 
     pub fn recv(&mut self, sock: Rc<socket2::Socket>, cb: RecvCallback<C>) {
-        println!("Receiving on sockfd {}", sock.as_raw_fd());
+        println!("Receiving on sockfd {:?}", sock);
         let c = Completion::Recv { sock, cb };
+        let key = self.get_key();
         match &c {
             Completion::Recv { sock, .. } => unsafe {
-                self.poller.add(sock, Event::readable(c.key())).unwrap();
+                self.poller.add(sock, Event::readable(key)).unwrap();
             },
             _ => {
                 todo!();
             }
         }
-        self.enqueue(c);
+        self.enqueue(key, c);
     }
 
     pub fn send(&mut self, sock: Rc<socket2::Socket>, buf: Bytes, n: usize, cb: SendCallback<C>) {
-        println!("Sending on sockfd {}", sock.as_raw_fd());
+        println!("Sending on sockfd {:?}", sock);
         let c = Completion::Send { sock, buf, n, cb };
+        let key = self.get_key();
         match &c {
             Completion::Send { sock, .. } => unsafe {
-                self.poller.add(sock, Event::writable(c.key())).unwrap();
+                self.poller.add(sock, Event::writable(key)).unwrap();
             },
             _ => {
                 todo!();
             }
         }
-        self.enqueue(c)
+        self.enqueue(key, c)
     }
 
-    fn enqueue(&mut self, c: Completion<C>) {
-        self.submissions.insert(c.key(), c);
+    fn get_key(&mut self) -> usize {
+        let ret = self.key_seq;
+        self.key_seq += 1;
+        ret
+    }
+
+    fn enqueue(&mut self, key: usize, c: Completion<C>) {
+        self.submissions.insert(key, c);
     }
 }
 
@@ -182,15 +190,6 @@ impl<C> std::fmt::Debug for Completion<C> {
 }
 
 impl<C> Completion<C> {
-    fn key(&self) -> usize {
-        match self {
-            Completion::Accept { server_sock, .. } => server_sock.as_raw_fd() as usize,
-            Completion::Close => todo!(),
-            Completion::Recv { sock, .. } => sock.as_raw_fd() as usize,
-            Completion::Send { sock, .. } => sock.as_raw_fd() as usize,
-        }
-    }
-
     fn prepare(&self) {
         match self {
             Completion::Accept { .. } => {}
