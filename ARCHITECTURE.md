@@ -19,7 +19,7 @@ I/O dispatch once.
 As an example, let's consider a TCP echo server. The top-level server function
 looks like this:
 
-```
+```rust
 fn main() {
  let sock = listen();
 
@@ -43,7 +43,7 @@ I/O dispatcher in a loop.
 
 The `on_accept` accept handler that accepts new connections looks like this:
 
-```
+```rust
 fn on_accept<T>(
  io: &mut IO<T>,
  server_sock: Rc<Socket>,
@@ -64,7 +64,7 @@ established client connection.
 
 The receive handler function is simple: we send back the message we received:
 
-```
+```rust
 fn on_recv<T>(io: &mut IO<T>, sock: Rc<Socket>, buf: &[u8], n: usize) {
  io.send(sock, buf, n, on_send);
 }
@@ -74,7 +74,7 @@ Finally, the send handler, which is called when we have sent the message,
 performs a `recv()` operation again to wait for the following message arriving
 on the connection:
 
-```
+```rust
 fn on_send<T>(io: &mut IO<T>, sock: Rc<Socket>, _n: usize) {
  io.recv(sock, on_recv)
 }
