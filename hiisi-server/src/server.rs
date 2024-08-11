@@ -33,6 +33,7 @@ fn on_accept<T>(
     sock_addr: SockAddr,
 ) {
     log::trace!("Server accepted connection from {:?}", sock_addr);
+    conn_sock.set_nodelay(true).unwrap();
     io.accept(server_sock, server_addr, on_accept);
     io.recv(conn_sock, on_recv);
 }
