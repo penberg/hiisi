@@ -32,7 +32,10 @@ impl<C> IO<C> {
     pub fn run_once(&mut self) {
         log::debug!("Running IO loop");
         self.events.clear();
-        let _ = self.poller.wait(&mut self.events, None);
+        let _ = self.poller.wait(
+            &mut self.events,
+            Some(std::time::Duration::from_micros(500)),
+        );
         self.flush_submissions();
         self.flush_completions();
     }

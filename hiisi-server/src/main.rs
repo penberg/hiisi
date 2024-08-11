@@ -3,9 +3,14 @@ use socket2::{Domain, SockAddr, Socket, Type};
 
 use std::net::SocketAddr;
 use std::rc::Rc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use std::path::PathBuf;
 
+use ctrlc;
 use hiisi::{Context, HiisiError, ResourceManager, Result, IO};
 
 #[derive(Parser)]
@@ -27,7 +32,7 @@ fn main() {
     }
 }
 
-fn server_loop(cli: Cli) -> Result<HiisiError> {
+fn server_loop(cli: Cli) -> Result<()> {
     log::info!("Listening for HTTP requests on {:?}", cli.http_listen_addr);
 
     let listen_addr: SockAddr = cli.http_listen_addr.into();
@@ -37,10 +42,20 @@ fn server_loop(cli: Cli) -> Result<HiisiError> {
     let ctx = Context::<()>::new(manager, ());
     let mut io = IO::new(ctx);
 
+    let running = Arc::new(AtomicBool::new(true));
+    ctrlc::set_handler({
+        print!("Received SIGINT, shutting down...\n");
+        let running = running.clone();
+        move || {
+            running.store(false, Ordering::SeqCst);
+        }
+    })
+    .unwrap();
     hiisi::serve(&mut io, sock, listen_addr);
-    loop {
+    while running.load(Ordering::SeqCst) {
         io.run_once();
     }
+    Ok(())
 }
 
 fn listen(addr: &SockAddr) -> Result<Rc<Socket>> {
