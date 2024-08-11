@@ -32,7 +32,7 @@ impl Connection {
         let path = std::ffi::CString::new(path.to_str().unwrap()).unwrap();
         let flags = libsql_ffi::SQLITE_OPEN_READWRITE
             | libsql_ffi::SQLITE_OPEN_CREATE
-            | libsql_ffi::SQLITE_OPEN_FULLMUTEX;
+            | libsql_ffi::SQLITE_OPEN_NOMUTEX;
         let vfs = std::ptr::null();
         let rc =
             unsafe { libsql_ffi::sqlite3_open_v2(path.as_ptr(), &mut conn, flags.into(), vfs) };
