@@ -2,9 +2,7 @@ use bytes::Bytes;
 
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
-use std::future::Future;
 use std::os::fd::AsRawFd;
-use std::pin::Pin;
 use std::rc::Rc;
 
 struct Socket {
@@ -41,20 +39,6 @@ impl<C> IO<C> {
 
     pub fn context(&self) -> &C {
         &self.context
-    }
-
-    pub fn block_on<T>(&self, mut future: impl Future<Output = T>) -> T {
-        let waker = futures::task::noop_waker();
-        let cx = &mut std::task::Context::from_waker(&waker);
-        let mut future = unsafe { Pin::new_unchecked(&mut future) };
-        loop {
-            match future.as_mut().poll(cx) {
-                std::task::Poll::Ready(val) => break val,
-                std::task::Poll::Pending => {
-                    // TODO: We could use a background task and call a completion here.
-                }
-            }
-        }
     }
 
     pub fn run_once(&mut self) {

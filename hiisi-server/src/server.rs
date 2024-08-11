@@ -40,7 +40,7 @@ fn on_accept<T>(
 fn execute_request<T>(io: &mut IO<T>, buf: &[u8]) -> Result<Bytes> {
     let ctx = io.context();
     let req = parse_request(&buf)?;
-    let resp = io.block_on(executor::execute_client_req(ctx.manager.clone(), req))?;
+    let resp = executor::execute_client_req(ctx.manager.clone(), req)?;
     Ok(proto::format_msg(&resp)?)
 }
 

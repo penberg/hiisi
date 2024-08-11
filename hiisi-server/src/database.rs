@@ -107,9 +107,7 @@ impl Stmt {
         match rc {
             libsql_ffi::SQLITE_ROW => Ok(StepResult::Row),
             libsql_ffi::SQLITE_DONE => Ok(StepResult::Done),
-            _ => {
-                Err(HiisiError::SqliteError(rc))
-            }
+            _ => Err(HiisiError::SqliteError(rc)),
         }
     }
 

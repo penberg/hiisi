@@ -48,7 +48,7 @@ impl ResourceManager {
         }
     }
 
-    pub async fn get_conn(&self, db_name: &str, baton: &str) -> Result<Rc<Connection>> {
+    pub fn get_conn(&self, db_name: &str, baton: &str) -> Result<Rc<Connection>> {
         let mut conns = self.conns.borrow_mut();
         if let Some(conn) = conns.get(baton) {
             return Ok(conn.clone());
@@ -59,14 +59,14 @@ impl ResourceManager {
             conns.insert(baton.to_string(), conn.clone());
             return Ok(conn);
         }
-        let (db, placeholder_conn) = self.open_conn(db_name).await?;
+        let (db, placeholder_conn) = self.open_conn(db_name)?;
         memory_resident_dbs.insert(db_name.to_string(), (db.clone(), placeholder_conn));
         let conn = Rc::new(db.connect()?);
         conns.insert(baton.to_string(), conn.clone());
         Ok(conn)
     }
 
-    async fn open_conn(&self, db_name: &str) -> Result<(Rc<Database>, Rc<Connection>)> {
+    fn open_conn(&self, db_name: &str) -> Result<(Rc<Database>, Rc<Connection>)> {
         let db_dir = self.db_path.join(db_name);
         std::fs::create_dir_all(db_dir.as_path()).unwrap();
         let db_path = db_dir.join(format!("{}.db", db_name));

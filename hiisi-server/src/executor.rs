@@ -22,7 +22,7 @@ fn generate_baton() -> String {
     uuid::Uuid::new_v4().to_string()
 }
 
-pub async fn execute_client_req(
+pub fn execute_client_req(
     manager: Rc<ResourceManager>,
     req: Request,
 ) -> Result<proto::PipelineRespBody> {
@@ -36,9 +36,9 @@ pub async fn execute_client_req(
     for req in &req.requests {
         let resp = match req {
             proto::StreamRequest::None => todo!(),
-            proto::StreamRequest::Close(_) => exec_close(manager.clone(), db_name, baton).await?,
+            proto::StreamRequest::Close(_) => exec_close(manager.clone(), db_name, baton)?,
             proto::StreamRequest::Execute(req) => {
-                exec_execute(manager.clone(), &req, db_name, baton).await?
+                exec_execute(manager.clone(), &req, db_name, baton)?
             }
             proto::StreamRequest::Batch(_) => todo!(),
             proto::StreamRequest::Sequence(_) => todo!(),
@@ -56,7 +56,7 @@ pub async fn execute_client_req(
     });
 }
 
-async fn exec_close(
+fn exec_close(
     manager: Rc<ResourceManager>,
     db_name: &str,
     baton: &str,
@@ -68,7 +68,7 @@ async fn exec_close(
     })
 }
 
-async fn exec_execute(
+fn exec_execute(
     manager: Rc<ResourceManager>,
     req: &proto::ExecuteStreamReq,
     db_name: &str,
@@ -80,16 +80,16 @@ async fn exec_execute(
         db_name,
         baton
     );
-    let conn = manager.get_conn(db_name, baton).await?;
+    let conn = manager.get_conn(db_name, baton)?;
     let sql = req.stmt.sql.as_ref().ok_or(HiisiError::InternalError(
         "No SQL statement found".to_string(),
     ))?;
     let stmt = conn.prepare(sql)?;
-    let result = make_execute_result(stmt).await?;
+    let result = make_execute_result(stmt)?;
     Ok(result)
 }
 
-async fn make_execute_result(stmt: Stmt) -> Result<proto::StreamResult> {
+fn make_execute_result(stmt: Stmt) -> Result<proto::StreamResult> {
     let column_count = stmt.column_count();
     let mut cols = Vec::with_capacity(column_count as usize);
     for i in 0..column_count {

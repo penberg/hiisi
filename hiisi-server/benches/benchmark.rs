@@ -1,4 +1,3 @@
-use criterion::async_executor::FuturesExecutor;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use hiisi::manager;
 use pprof::criterion::{Output, PProfProfiler};
@@ -11,7 +10,7 @@ fn bench(c: &mut Criterion) {
     let path = std::path::Path::new("data");
     let manager = Rc::new(manager::ResourceManager::new(path));
     group.bench_function("execute", |b| {
-        b.to_async(FuturesExecutor).iter(|| async {
+        b.iter(|| {
             let exec_req = hiisi::proto::StreamRequest::Execute(hiisi::proto::ExecuteStreamReq {
                 stmt: hiisi::proto::Stmt {
                     sql: Some("SELECT 1".to_string()),
@@ -30,9 +29,7 @@ fn bench(c: &mut Criterion) {
                 database: "test".to_string(),
                 req,
             };
-            hiisi::executor::execute_client_req(manager.clone(), req)
-                .await
-                .unwrap();
+            hiisi::executor::execute_client_req(manager.clone(), req).unwrap();
         });
     });
 }
