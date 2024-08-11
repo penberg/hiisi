@@ -8,7 +8,8 @@ fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("hiisi");
     group.throughput(Throughput::Elements(1));
 
-    let manager = Rc::new(manager::ResourceManager::new());
+    let path = std::path::Path::new("data");
+    let manager = Rc::new(manager::ResourceManager::new(path));
     group.bench_function("execute", |b| {
         b.to_async(FuturesExecutor).iter(|| async {
             let exec_req = hiisi::proto::StreamRequest::Execute(hiisi::proto::ExecuteStreamReq {
