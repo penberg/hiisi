@@ -48,6 +48,12 @@ impl ResourceManager {
         }
     }
 
+    pub fn create_database(&self, db_name: &str) -> Result<()> {
+        let db_dir = self.db_path.join(db_name);
+        std::fs::create_dir_all(db_dir.as_path()).unwrap();
+        Ok(())
+    }
+
     pub fn get_conn(&self, db_name: &str, baton: &str) -> Result<Rc<Connection>> {
         let mut conns = self.conns.borrow_mut();
         if let Some(conn) = conns.get(baton) {
@@ -68,7 +74,6 @@ impl ResourceManager {
 
     fn open_conn(&self, db_name: &str) -> Result<(Rc<Database>, Rc<Connection>)> {
         let db_dir = self.db_path.join(db_name);
-        std::fs::create_dir_all(db_dir.as_path()).unwrap();
         let db_path = db_dir.join(format!("{}.db", db_name));
         let db = Database::new(db_path.into());
         let conn = db.connect()?;

@@ -1,6 +1,8 @@
+pub mod admin;
 pub mod database;
 pub mod error;
 pub mod executor;
+pub mod http;
 pub mod io;
 pub mod manager;
 pub mod proto;
