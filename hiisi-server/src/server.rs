@@ -1,17 +1,18 @@
 use anyhow::Result;
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use socket2::{SockAddr, Socket};
 
 use std::rc::Rc;
 
 use crate::executor::{self, Request};
+use crate::http;
 use crate::ResourceManager;
 use crate::{proto, HiisiError};
 
 pub type IO<T> = crate::io::IO<Context<T>>;
 
 pub struct Context<T> {
-    manager: Rc<ResourceManager>,
+    pub manager: Rc<ResourceManager>,
     pub user_data: T,
 }
 
@@ -52,8 +53,8 @@ fn on_recv<T>(io: &mut IO<T>, sock: Rc<Socket>, buf: &[u8], n: usize) {
         return;
     }
     let resp = match execute_request(io, &buf[..n]) {
-        Ok(resp) => format_response(resp, http::StatusCode::OK),
-        Err(x) => format_response(
+        Ok(resp) => http::format_response(resp, http::StatusCode::OK),
+        Err(x) => http::format_response(
             format!("{}", x).into(),
             http::StatusCode::INTERNAL_SERVER_ERROR,
         ),
@@ -113,33 +114,6 @@ fn parse_route(path: &str) -> Option<Route> {
         "/v2/pipeline" => Some(Route::Pipeline),
         _ => None,
     }
-}
-
-fn format_response(body: Bytes, status: http::StatusCode) -> Bytes {
-    let n = body.len();
-
-    let response = http::Response::builder().status(status).body(body).unwrap();
-
-    let mut response_bytes = BytesMut::new();
-    response_bytes.extend_from_slice(
-        format!(
-            "HTTP/1.1 {} {}\r\n",
-            response.status().as_u16(),
-            response.status().canonical_reason().unwrap_or("")
-        )
-        .as_bytes(),
-    );
-
-    for (key, value) in response.headers() {
-        response_bytes.extend_from_slice(
-            format!("{}: {}\r\n", key.as_str(), value.to_str().unwrap()).as_bytes(),
-        );
-    }
-
-    response_bytes.extend_from_slice(format!("Content-Length: {}\r\n\r\n", n).as_bytes());
-    response_bytes.extend_from_slice(response.into_body().as_ref());
-
-    response_bytes.into()
 }
 
 fn on_send<T>(io: &mut IO<T>, sock: Rc<Socket>, _n: usize) {

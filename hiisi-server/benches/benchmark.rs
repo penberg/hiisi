@@ -9,6 +9,7 @@ fn bench(c: &mut Criterion) {
 
     let path = std::path::Path::new("data");
     let manager = Rc::new(manager::ResourceManager::new(path));
+    manager.create_database("test").unwrap();
     group.bench_function("execute", |b| {
         b.iter(|| {
             let exec_req = hiisi::proto::StreamRequest::Execute(hiisi::proto::ExecuteStreamReq {

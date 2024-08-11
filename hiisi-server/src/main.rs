@@ -21,6 +21,10 @@ struct Cli {
 
     #[arg(long, default_value = "127.0.0.1:8080", env = "SQLD_HTTP_LISTEN_ADDR")]
     http_listen_addr: SocketAddr,
+
+    /// The address and port for the admin HTTP API.
+    #[clap(long, env = "SQLD_ADMIN_LISTEN_ADDR")]
+    admin_listen_addr: Option<SocketAddr>,
 }
 
 fn main() {
@@ -33,10 +37,23 @@ fn main() {
 }
 
 fn server_loop(cli: Cli) -> Result<()> {
-    log::info!("Listening for HTTP requests on {:?}", cli.http_listen_addr);
+    log::info!(
+        "Listening for SQL HTTP requests on {:?}",
+        cli.http_listen_addr
+    );
 
     let listen_addr: SockAddr = cli.http_listen_addr.into();
     let sock = listen(&listen_addr)?;
+
+    let admin = match cli.admin_listen_addr {
+        Some(addr) => {
+            log::info!("Listening for admin HTTP requests on {:?}", addr);
+            let listen_addr: SockAddr = addr.into();
+            let sock = listen(&listen_addr)?;
+            Some((listen_addr, sock))
+        }
+        None => None,
+    };
 
     let manager = Rc::new(ResourceManager::new(&cli.db_path));
     let ctx = Context::<()>::new(manager, ());
@@ -52,6 +69,9 @@ fn server_loop(cli: Cli) -> Result<()> {
     })
     .unwrap();
     hiisi::serve(&mut io, sock, listen_addr);
+    if let Some((addr, sock)) = admin {
+        hiisi::admin::serve_admin(&mut io, sock, addr);
+    }
     while running.load(Ordering::SeqCst) {
         io.run_once();
     }
