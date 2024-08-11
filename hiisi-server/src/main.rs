@@ -11,7 +11,7 @@ use hiisi::{Context, HiisiError, ResourceManager, Result, IO};
 #[derive(Parser)]
 #[command(name = "Hiisi")]
 struct Cli {
-    #[clap(long, short, default_value = "data.sqld", env = "SQLD_DB_PATH")]
+    #[clap(long, short, default_value = "data", env = "SQLD_DB_PATH")]
     db_path: PathBuf,
 
     #[arg(long, default_value = "127.0.0.1:8080", env = "SQLD_HTTP_LISTEN_ADDR")]
