@@ -50,6 +50,8 @@ fn listen(addr: &SockAddr) -> Result<Rc<Socket>> {
     );
     sock.bind(addr)
         .map_err(|e| HiisiError::IOError("bind", e))?;
+    sock.set_reuse_address(true)
+        .map_err(|e| HiisiError::IOError("set_reuse_address", e))?;
     sock.set_reuse_port(true)
         .map_err(|e| HiisiError::IOError("set_reuse_port", e))?;
     sock.listen(128)
