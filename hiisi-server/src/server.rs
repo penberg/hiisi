@@ -5,8 +5,8 @@ use socket2::{SockAddr, Socket};
 use std::rc::Rc;
 
 use crate::executor::{self, Request};
-use crate::proto;
 use crate::ResourceManager;
+use crate::{proto, HiisiError};
 
 pub type IO<T> = crate::io::IO<Context<T>>;
 
@@ -63,16 +63,56 @@ fn on_recv<T>(io: &mut IO<T>, sock: Rc<Socket>, buf: &[u8], n: usize) {
     io.send(sock, resp.into(), n, on_send);
 }
 
+enum Route {
+    // The `/v2/pipeline` route.
+    Pipeline,
+}
+
 fn parse_request(buf: &[u8]) -> Result<Request> {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut req = httparse::Request::new(&mut headers);
     let body_off = req.parse(buf).unwrap().unwrap();
-    let database = "hello"; // TODO: take from request path
-    let req = proto::parse_client_req(&buf[body_off..])?;
-    Ok(Request {
-        database: database.to_owned(),
-        req,
-    })
+    let database = parse_database(&mut req)?;
+    match parse_route(req.path.unwrap()) {
+        Some(Route::Pipeline) => {
+            let req = proto::parse_client_req(&buf[body_off..])?;
+            Ok(Request {
+                database: database.to_owned(),
+                req,
+            })
+        }
+        None => Err(HiisiError::ProtocolError("Invalid path".to_owned()).into()),
+    }
+}
+
+const DEFAULT_DATABASE: &'static str = "default";
+
+fn parse_database(req: &mut httparse::Request) -> Result<String> {
+    let mut host: Option<&str> = None;
+    for header in req.headers.iter() {
+        if header.name == "Host" {
+            host = Some(std::str::from_utf8(header.value)?);
+            break;
+        }
+    }
+    match host {
+        Some(host) => {
+            let parts: Vec<&str> = host.split('.').collect();
+            if parts.len() > 1 {
+                Ok(parts[0].to_owned())
+            } else {
+                Err(HiisiError::ProtocolError("Invalid host".to_owned()).into())
+            }
+        }
+        None => Ok(DEFAULT_DATABASE.into()),
+    }
+}
+
+fn parse_route(path: &str) -> Option<Route> {
+    match path {
+        "/v2/pipeline" => Some(Route::Pipeline),
+        _ => None,
+    }
 }
 
 fn format_response(body: Bytes, status: http::StatusCode) -> Bytes {
