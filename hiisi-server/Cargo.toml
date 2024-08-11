@@ -2,7 +2,6 @@
 name = "hiisi"
 version.workspace = true
 authors.workspace = true
-default-run = "hiisid"
 edition.workspace = true
 license.workspace = true
 description = "The Limbo interactive SQL shell"

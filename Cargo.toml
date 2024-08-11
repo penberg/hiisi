@@ -4,6 +4,9 @@ members = [
   "hiisi-server",
   "hiisi-simulator",
 ]
+default-members = [
+  "hiisi-server",
+]
 
 [workspace.package]
 version = "0.0.0"
