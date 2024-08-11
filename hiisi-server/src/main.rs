@@ -44,9 +44,9 @@ fn server_loop(cli: Cli) -> Result<()> {
 
     let running = Arc::new(AtomicBool::new(true));
     ctrlc::set_handler({
-        print!("Received SIGINT, shutting down...\n");
         let running = running.clone();
         move || {
+            print!("Received SIGINT, shutting down...\n");
             running.store(false, Ordering::SeqCst);
         }
     })
