@@ -12,6 +12,6 @@ pub enum HiisiError {
     IOError(&'static str, std::io::Error),
     #[error("Out of memory")]
     OutOfMemory,
-    #[error("SQL error: {0}")]
-    SQLError(#[from] libsql::Error),
+    #[error("SQLite error: {0}")]
+    SqliteError(i32),
 }

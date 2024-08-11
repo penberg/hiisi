@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::database::{Connection, Database};
 use crate::Result;
 
 // Maximum per database page cache size in kibi-bytes.
@@ -24,8 +25,7 @@ pub struct ResourceManager {
     ///
     /// We keep a tuple of database and connection in the cache because we
     /// need at least one connection to SQLite to keep the database in memory.
-    memory_resident_dbs:
-        RefCell<SieveCache<String, (Rc<libsql::Database>, Rc<libsql::Connection>)>>,
+    memory_resident_dbs: RefCell<SieveCache<String, (Rc<Database>, Rc<Connection>)>>,
 
     /// Open connections to databases.
     ///
@@ -33,7 +33,7 @@ pub struct ResourceManager {
     /// session. SQL statements executed with the same baton are guaranteed
     /// to be executed with the same SQLite connection, ensuring transaction
     /// and isolation guarantees.
-    conns: RefCell<SieveCache<String, Rc<libsql::Connection>>>,
+    conns: RefCell<SieveCache<String, Rc<Connection>>>,
 }
 
 impl ResourceManager {
@@ -48,7 +48,7 @@ impl ResourceManager {
         }
     }
 
-    pub async fn get_conn(&self, db_name: &str, baton: &str) -> Result<Rc<libsql::Connection>> {
+    pub async fn get_conn(&self, db_name: &str, baton: &str) -> Result<Rc<Connection>> {
         let mut conns = self.conns.borrow_mut();
         if let Some(conn) = conns.get(baton) {
             return Ok(conn.clone());
@@ -66,26 +66,15 @@ impl ResourceManager {
         Ok(conn)
     }
 
-    async fn open_conn(
-        &self,
-        db_name: &str,
-    ) -> Result<(Rc<libsql::Database>, Rc<libsql::Connection>)> {
+    async fn open_conn(&self, db_name: &str) -> Result<(Rc<Database>, Rc<Connection>)> {
         let db_dir = self.db_path.join(db_name);
         std::fs::create_dir_all(db_dir.as_path()).unwrap();
         let db_path = db_dir.join(format!("{}.db", db_name));
-        let db = libsql::Builder::new_local(db_path).build().await.unwrap();
-        let conn = db.connect().unwrap();
-        conn.query("PRAGMA journal_mode = WAL", libsql::params![])
-            .await
-            .unwrap();
-        let cache_size_pragma = format!("PRAGMA cache_size = -{}", MAX_PAGE_CACHE_SIZE);
-        conn.query(&cache_size_pragma, libsql::params![])
-            .await
-            .unwrap();
-        // Enable exclusive file locking.
-        conn.query("PRAGMA locking_mode = EXCLUSIVE", libsql::params![])
-            .await
-            .unwrap();
+        let db = Database::new(db_path.into());
+        let conn = db.connect()?;
+        conn.pragma("journal_mode", "WAL")?;
+        conn.pragma("cache_size", format!("-{}", MAX_PAGE_CACHE_SIZE))?;
+        conn.pragma("locking_mode", "EXCLUSIVE")?;
         Ok((Rc::new(db), Rc::new(conn)))
     }
 
