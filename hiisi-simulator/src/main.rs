@@ -6,6 +6,8 @@ use rand_chacha::ChaCha8Rng;
 use socket2::{Domain, Socket, Type};
 use std::os::fd::AsRawFd;
 
+use std::path::Path;
+
 pub struct UserData {
     rng: RefCell<ChaCha8Rng>,
 }
@@ -28,7 +30,7 @@ pub fn main() {
     let user_data = UserData {
         rng: RefCell::new(rng),
     };
-    let ctx = Context::new(Rc::new(hiisi::manager::ResourceManager::new()), user_data);
+    let ctx = Context::new(Rc::new(hiisi::manager::ResourceManager::new(Path::new("data"))), user_data);
     let mut io = hiisi::server::IO::new(ctx);
 
     let server_addr: std::net::SocketAddr = "127.0.0.1:8080".parse().unwrap();
