@@ -1,7 +1,7 @@
 use sieve_cache::SieveCache;
 
 use std::cell::RefCell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use crate::Result;
@@ -18,6 +18,8 @@ const MAX_CONCURRENT_CONNS: usize = 100;
 /// The resource manager is responsible for managing connections to databases,
 /// transactions, and more.
 pub struct ResourceManager {
+    db_path: PathBuf,
+
     /// A cache of memory resident databases.
     ///
     /// We keep a tuple of database and connection in the cache because we
@@ -35,10 +37,12 @@ pub struct ResourceManager {
 }
 
 impl ResourceManager {
-    pub fn new() -> Self {
+    pub fn new(db_path: &Path) -> Self {
         let memory_resident_dbs = SieveCache::new(MAX_MEMORY_RESIDENT_DBS).unwrap();
         let conns = SieveCache::new(MAX_CONCURRENT_CONNS).unwrap();
+        std::fs::create_dir_all(db_path).unwrap();
         ResourceManager {
+            db_path: db_path.to_owned(),
             memory_resident_dbs: RefCell::new(memory_resident_dbs),
             conns: RefCell::new(conns),
         }
@@ -66,7 +70,7 @@ impl ResourceManager {
         &self,
         db_name: &str,
     ) -> Result<(Rc<libsql::Database>, Rc<libsql::Connection>)> {
-        let db_dir = Path::new("data").join(db_name);
+        let db_dir = self.db_path.join(db_name);
         std::fs::create_dir_all(db_dir.as_path()).unwrap();
         let db_path = db_dir.join(format!("{}.db", db_name));
         let db = libsql::Builder::new_local(db_path).build().await.unwrap();

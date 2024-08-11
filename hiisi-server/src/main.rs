@@ -4,11 +4,16 @@ use socket2::{Domain, SockAddr, Socket, Type};
 use std::net::SocketAddr;
 use std::rc::Rc;
 
+use std::path::PathBuf;
+
 use hiisi::{Context, HiisiError, ResourceManager, Result, IO};
 
 #[derive(Parser)]
 #[command(name = "Hiisi")]
 struct Cli {
+    #[clap(long, short, default_value = "data.sqld", env = "SQLD_DB_PATH")]
+    db_path: PathBuf,
+
     #[arg(long, default_value = "127.0.0.1:8080", env = "SQLD_HTTP_LISTEN_ADDR")]
     http_listen_addr: SocketAddr,
 }
@@ -28,7 +33,7 @@ fn server_loop(cli: Cli) -> Result<HiisiError> {
     let listen_addr: SockAddr = cli.http_listen_addr.into();
     let sock = listen(&listen_addr)?;
 
-    let manager = Rc::new(ResourceManager::new());
+    let manager = Rc::new(ResourceManager::new(&cli.db_path));
     let ctx = Context::<()>::new(manager, ());
     let mut io = IO::new(ctx);
 
