@@ -55,7 +55,6 @@ impl Connection {
             )
         };
         if rc != libsql_ffi::SQLITE_OK {
-            todo!();
             return Err(HiisiError::SqliteError(rc));
         }
         Ok(Stmt { stmt })
@@ -109,7 +108,6 @@ impl Stmt {
             libsql_ffi::SQLITE_ROW => Ok(StepResult::Row),
             libsql_ffi::SQLITE_DONE => Ok(StepResult::Done),
             _ => {
-                todo!();
                 Err(HiisiError::SqliteError(rc))
             }
         }
