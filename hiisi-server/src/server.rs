@@ -62,7 +62,7 @@ fn on_recv<T>(io: &mut IO<T>, sock: Rc<Socket>, buf: &[u8], n: usize) {
         Ok(resp) => http::format_response(resp, http::StatusCode::OK),
         Err(x) => http::format_response(
             format!("{}", x).into(),
-            http::StatusCode::INTERNAL_SERVER_ERROR,
+            http::StatusCode::BAD_REQUEST,
         ),
     };
 
@@ -82,7 +82,7 @@ enum Route {
 fn parse_request(buf: &[u8]) -> Result<Request> {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut req = httparse::Request::new(&mut headers);
-    let body_off = req.parse(buf).unwrap().unwrap();
+    let body_off = req.parse(buf)?.unwrap();
     let database = parse_database(&mut req)?;
     match parse_route(req.path.unwrap()) {
         Some(Route::Pipeline) => {

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use socket2::{Domain, Socket, Type};
@@ -61,41 +61,7 @@ fn on_client_connect(io: &mut IO, sock: Rc<socket2::Socket>, client_addr: socket
     perform_client_req(io, sock);
 }
 
-enum PerformClientReqFault {
-    // Client sends an empty message to the server.
-    Empty,
-}
-
-fn gen_perform_client_req_fault(
-    ctx: &hiisi::server::Context<UserData>,
-) -> Option<PerformClientReqFault> {
-    let user_data = &ctx.user_data;
-    let mut rng = user_data.rng.borrow_mut();
-    if rng.gen_bool(0.1) {
-        Some(PerformClientReqFault::Empty)
-    } else {
-        None
-    }
-}
-
 fn perform_client_req(io: &mut IO, sock: Rc<Socket>) {
-    let ctx = io.context();
-    match gen_perform_client_req_fault(ctx) {
-        Some(PerformClientReqFault::Empty) => {
-            perform_client_req_empty(io, sock);
-        }
-        None => {
-            perform_client_req_normal(io, sock);
-        }
-    }
-}
-
-fn perform_client_req_empty(io: &mut IO, sock: Rc<Socket>) {
-    let http_req = BytesMut::from("");
-    io.send(sock, http_req.into(), 0, on_client_send);
-}
-
-fn perform_client_req_normal(io: &mut IO, sock: Rc<Socket>) {
     let req = hiisi::proto::StreamRequest::Execute(hiisi::proto::ExecuteStreamReq {
         stmt: hiisi::proto::Stmt {
             sql: Some("SELECT 1".to_owned()),
@@ -120,14 +86,43 @@ fn perform_client_req_normal(io: &mut IO, sock: Rc<Socket>) {
     http_req.extend_from_slice(http_header.as_bytes());
     http_req.extend_from_slice(&buf);
     let n = http_req.len();
-    io.send(sock, http_req.into(), n, on_client_send);
+    send_client_msg(io, sock, http_req.into(), n);
 }
 
-fn on_client_send(io: &mut IO, server_sock: Rc<socket2::Socket>, n: usize) {
-    io.recv(server_sock, on_client_recv);
+fn send_client_msg(io: &mut IO, sock: Rc<socket2::Socket>, buf: Bytes, n: usize) {
+    match gen_perform_client_req_fault(io.context()) {
+        PerformClientReqFault::Normal => {
+            io.send(sock, buf, n, on_client_send_normal);
+        }
+        PerformClientReqFault::Fuzz => {
+            let bad_request = Bytes::from_static(b"FUZZ FUZZ FUZZ"); // Fuzzed request.
+            io.send(sock, bad_request, n, on_client_send_fuzz);
+        }
+    }
 }
 
-fn on_client_recv(io: &mut IO, socket: Rc<socket2::Socket>, buf: &[u8], n: usize) {
+enum PerformClientReqFault {
+    // Client sends a normal message to the server.
+    Normal,
+    // Client sends a fuzzed message to the server.
+    Fuzz,
+}
+
+fn gen_perform_client_req_fault(ctx: &hiisi::server::Context<UserData>) -> PerformClientReqFault {
+    let user_data = &ctx.user_data;
+    let mut rng = user_data.rng.borrow_mut();
+    if rng.gen_bool(0.9) {
+        PerformClientReqFault::Normal
+    } else {
+        PerformClientReqFault::Fuzz
+    }
+}
+
+fn on_client_send_normal(io: &mut IO, server_sock: Rc<socket2::Socket>, n: usize) {
+    io.recv(server_sock, on_client_recv_normal);
+}
+
+fn on_client_recv_normal(io: &mut IO, socket: Rc<socket2::Socket>, buf: &[u8], n: usize) {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut resp = httparse::Response::new(&mut headers);
     let body_off = resp.parse(buf).unwrap().unwrap();
@@ -135,6 +130,22 @@ fn on_client_recv(io: &mut IO, socket: Rc<socket2::Socket>, buf: &[u8], n: usize
         let body = std::str::from_utf8(&buf[body_off..]).unwrap();
         println!("Error: {:?} -> {}", resp, body);
         assert_eq!(resp.code.unwrap(), 200);
+    }
+    perform_client_req(io, socket);
+}
+
+fn on_client_send_fuzz(io: &mut IO, server_sock: Rc<socket2::Socket>, n: usize) {
+    io.recv(server_sock, on_client_recv_fuzz);
+}
+
+fn on_client_recv_fuzz(io: &mut IO, socket: Rc<socket2::Socket>, buf: &[u8], n: usize) {
+    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut resp = httparse::Response::new(&mut headers);
+    let body_off = resp.parse(buf).unwrap().unwrap();
+    if resp.code.unwrap() != 400 {
+        let body = std::str::from_utf8(&buf[body_off..]).unwrap();
+        println!("Error: {:?} -> {}", resp, body);
+        assert_eq!(resp.code.unwrap(), 400);
     }
     perform_client_req(io, socket);
 }
