@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-Execute SQL remotely on  libSQL/SQLite databases.
+Proof of concept libSQL server written in Rust with deterministic simulation testing.
 </p>
 
 <p align="center">
@@ -23,8 +23,7 @@ _Hiisi is an experimental proof-of-concept and is not suitable for production us
 
 ## Features
 
-- Support for libSQL [wire protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HRANA_2_SPEC.md)
-- Designed for massive multitenancy
+- libSQL server supporting the [wire protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HRANA_2_SPEC.md)
 - Deterministic simulation testing (DST)
 
 ## Getting Started
@@ -48,6 +47,4 @@ cd server && cargo run
 Hiisi is a proof-of-concept alternative to the libSQL server, which
 provides the same functionality for remote SQL execution for
 libSQL/SQLite databases. There is no hard dependency between the two
-projects. Of course, if Hiisi becomes widely successful, we might
-consider merging with libSQL, but that is something that will be decided
-in the future.
+projects.
