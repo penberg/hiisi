@@ -52,6 +52,12 @@ fn on_recv<T>(io: &mut IO<T>, sock: Rc<Socket>, buf: &[u8], n: usize) {
         io.close(sock);
         return;
     }
+    // When receiving POST request with chunked encoding,
+    // the end marker consist of those bytes - [13, 10, 48, 13, 10, 13, 10]
+    // and we don't recv them from the socket in one go.
+    if n == 7 && is_complete_chunked_encoding_mark(buf) {
+        return;
+    }
     let resp = match execute_request(io, &buf[..n]) {
         Ok(resp) => http::format_response(resp, http::StatusCode::OK),
         Err(x) => http::format_response(
@@ -62,6 +68,10 @@ fn on_recv<T>(io: &mut IO<T>, sock: Rc<Socket>, buf: &[u8], n: usize) {
 
     let n = resp.len();
     io.send(sock, resp.into(), n, on_send);
+}
+
+fn is_complete_chunked_encoding_mark(buf: &[u8]) -> bool {
+    buf == b"\r\n0\r\n\r\n" 
 }
 
 enum Route {
