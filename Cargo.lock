@@ -596,6 +596,7 @@ dependencies = [
  "bytes",
  "env_logger",
  "hiisi",
+ "httparse",
  "log",
  "rand",
  "rand_chacha",

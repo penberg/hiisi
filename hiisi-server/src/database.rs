@@ -28,6 +28,7 @@ impl Drop for Connection {
 
 impl Connection {
     pub fn open(path: &Path) -> Result<Self> {
+        log::trace!("Opening database: {:?}", path);
         let mut conn = std::ptr::null_mut();
         let path = std::ffi::CString::new(path.to_str().unwrap()).unwrap();
         let flags = libsql_ffi::SQLITE_OPEN_READWRITE
